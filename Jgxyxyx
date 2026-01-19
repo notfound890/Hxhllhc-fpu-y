@@ -1,0 +1,143 @@
+local Players = game:GetService("Players")
+local LP = Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+local RunService = game:GetService("RunService")
+local PPS = game:GetService("ProximityPromptService")
+local Lighting = game:GetService("Lighting")
+
+_G.InstantHold = false 
+
+-- // CONFIGURACIÓN DE CÁMARA
+local function SetInfiniteZoom()
+    LP.CameraMaxZoomDistance = 10000
+    LP.CameraMinZoomDistance = 0.5
+end
+SetInfiniteZoom()
+
+-- // LIMPIEZA DE GUI PREVIA
+if CoreGui:FindFirstChild("NotFoundHub") then CoreGui.NotFoundHub:Destroy() end
+
+-- // FUNCIÓN DE TELEPORTE (GLIDE)
+local function GlideTo(targetCF)
+    local char = LP.Character
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    local safeCF = targetCF * CFrame.new(0, 2, 0)
+    for _, p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
+    local dist = (hrp.Position - safeCF.Position).Magnitude
+    local speed = 700
+    local tween = TweenService:Create(hrp, TweenInfo.new(dist/speed, Enum.EasingStyle.Linear), {CFrame = safeCF})
+    tween:Play()
+    tween.Completed:Connect(function()
+        hrp.Velocity = Vector3.new(0,0,0)
+        task.wait(0.1)
+        for _, p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = true end end
+    end)
+end
+
+-- // INTERFAZ ORIGINAL
+local sg = Instance.new("ScreenGui", CoreGui); sg.Name = "NotFoundHub"
+local Main = Instance.new("Frame", sg)
+Main.Size = UDim2.new(0, 380, 0, 230); Main.Position = UDim2.new(0.5, -190, 0.5, -115)
+Main.BackgroundColor3 = Color3.fromRGB(12, 12, 12); Main.BackgroundTransparency = 0.15; Main.Active, Main.Draggable = true, true
+local Stroke = Instance.new("UIStroke", Main); Stroke.Thickness = 2
+task.spawn(function() while task.wait() do Stroke.Color = Color3.fromHSV(tick() % 5 / 5, 0.8, 1) end end)
+
+local TsunamiAlert = Instance.new("TextLabel", Main)
+TsunamiAlert.Size = UDim2.new(1, -10, 0, 22); TsunamiAlert.Position = UDim2.new(0, 5, 1, 5)
+TsunamiAlert.BackgroundColor3 = Color3.fromRGB(20, 20, 20); TsunamiAlert.TextColor3 = Color3.new(1,1,1)
+TsunamiAlert.Font = Enum.Font.Code; TsunamiAlert.Text = "Radar: Online"
+Instance.new("UICorner", TsunamiAlert)
+
+-- Lluvia Estética
+task.spawn(function()
+    while task.wait(0.15) do
+        if Main.Visible then
+            local drop = Instance.new("Frame", Main)
+            drop.Size = UDim2.new(0, 1, 0, 10); drop.Position = UDim2.new(math.random(), 0, -0.1, 0)
+            drop.BackgroundColor3 = Color3.fromRGB(200, 200, 255); drop.BackgroundTransparency = 0.5
+            drop:TweenPosition(UDim2.new(drop.Position.X.Scale, 0, 1.1, 0), "In", "Linear", 1.5)
+            task.delay(1.5, function() drop:Destroy() end)
+        end
+    end
+end)
+
+local TopBar = Instance.new("Frame", Main); TopBar.Size = UDim2.new(1, 0, 0, 30); TopBar.BackgroundTransparency = 1
+local Title = Instance.new("TextLabel", TopBar)
+Title.Size = UDim2.new(1, -40, 1, 0); Title.Position = UDim2.new(0, 12, 0, 0); Title.Text = "NOTFOUND HUB"; Title.TextColor3 = Color3.new(1,1,1); Title.Font = Enum.Font.Code; Title.TextXAlignment = "Left"
+local MinBtn = Instance.new("TextButton", TopBar)
+MinBtn.Size = UDim2.new(0, 25, 0, 25); MinBtn.Position = UDim2.new(1, -30, 0, 2.5); MinBtn.Text = "-"; MinBtn.TextColor3 = Color3.new(1,1,1); MinBtn.BackgroundColor3 = Color3.fromRGB(30,30,30)
+Instance.new("UICorner", MinBtn)
+
+local SideBar = Instance.new("Frame", Main); SideBar.Size = UDim2.new(0, 100, 1, -40); SideBar.Position = UDim2.new(0, 5, 0, 30); SideBar.BackgroundTransparency = 0.6; SideBar.BackgroundColor3 = Color3.new(0,0,0)
+Instance.new("UIListLayout", SideBar).Padding = UDim.new(0, 2)
+local Container = Instance.new("Frame", Main); Container.Size = UDim2.new(1, -115, 1, -45); Container.Position = UDim2.new(0, 110, 0, 35); Container.BackgroundTransparency = 1
+
+local Windows = {}
+local function CreateWindow(name)
+    local f = Instance.new("ScrollingFrame", Container); f.Size = UDim2.new(1, 0, 1, 0); f.BackgroundTransparency = 1; f.Visible = false; f.ScrollBarThickness = 0; f.AutomaticCanvasSize = "Y"
+    Instance.new("UIListLayout", f).Padding = UDim.new(0, 5)
+    local btn = Instance.new("TextButton", SideBar); btn.Size = UDim2.new(1, 0, 0, 35); btn.Text = name; btn.TextColor3 = Color3.new(1,1,1); btn.BackgroundColor3 = Color3.fromRGB(20,20,20); btn.Font = Enum.Font.Code
+    btn.MouseButton1Click:Connect(function() for _, w in pairs(Windows) do w.Visible = false end f.Visible = true end)
+    Windows[name] = f; return f
+end
+
+local function AddButton(parent, txt, func)
+    local b = Instance.new("TextButton", parent); b.Size = UDim2.new(1, -5, 0, 35); b.BackgroundColor3 = Color3.fromRGB(25, 25, 25); b.Text = txt; b.TextColor3 = Color3.new(1,1,1); b.Font = Enum.Font.Code; b.TextSize = 10
+    Instance.new("UICorner", b); b.MouseButton1Click:Connect(function() func(b) end)
+end
+
+local winMain = CreateWindow("MAIN")
+local winZones = CreateWindow("REFUGIOS")
+
+AddButton(winMain, "INSTANT GRAB: OFF", function(s) 
+    _G.InstantHold = not _G.InstantHold 
+    s.Text = _G.InstantHold and "INSTANT GRAB: ON" or "INSTANT GRAB: OFF"
+    s.TextColor3 = _G.InstantHold and Color3.fromRGB(0, 255, 150) or Color3.new(1,1,1)
+end)
+
+AddButton(winMain, "FIX ZOOM", SetInfiniteZoom)
+
+local zones = {
+    {"ZONA 0", CFrame.new(123.6, 3.2, -18.2)}, {"ZONA 1", CFrame.new(201.7, -2.7, -4.6)},
+    {"ZONA 2", CFrame.new(284.2, -2.7, 3.9)}, {"ZONA 3", CFrame.new(401.7, -2.7, -5.1)},
+    {"ZONA 4", CFrame.new(538.9, -2.7, -0.3)}, {"ZONA 5", CFrame.new(751.9, -2.7, -1.4)},
+    {"ZONA 6", CFrame.new(1070.7, -2.7, 12.7)}, {"ZONA 7", CFrame.new(1538.5, -2.7, -5.5)},
+    {"ZONA 8", CFrame.new(2232.2, -2.7, 24.4)}, {"ZONA 9", CFrame.new(2593.6, -5.3, 22.0)}
+}
+for _, z in pairs(zones) do AddButton(winZones, z[1], function() GlideTo(z[2]) end) end
+
+-- Radar
+RunService.Heartbeat:Connect(function()
+    local tsunami = workspace:FindFirstChild("ActiveTsunamis") or workspace:FindFirstChild("Tsunami")
+    if tsunami and LP.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = LP.Character.HumanoidRootPart
+        local closest = 5000
+        for _, v in pairs(tsunami:GetDescendants()) do
+            if v:IsA("BasePart") then
+                local d = (v.Position - hrp.Position).Magnitude
+                if d < closest then closest = d end
+            end
+        end
+        if closest < 1000 then
+            TsunamiAlert.Text = "⚠️ TSUNAMI A " .. math.floor(closest) .. "m"
+            TsunamiAlert.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+        else
+            TsunamiAlert.Text = "Radar: Despejado"
+            TsunamiAlert.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+        end
+    end
+end)
+
+local open = true
+MinBtn.MouseButton1Click:Connect(function()
+    open = not open
+    Main:TweenSize(open and UDim2.new(0, 380, 0, 230) or UDim2.new(0, 150, 0, 30), "Out", "Quart", 0.3, true)
+    SideBar.Visible, Container.Visible, TsunamiAlert.Visible = open, open, open
+    MinBtn.Text = open and "-" or "+"
+end)
+
+PPS.PromptButtonHoldBegan:Connect(function(p) if _G.InstantHold then p.HoldDuration = 0 if fireproximityprompt then fireproximityprompt(p) end end end)
+
+Windows["MAIN"].Visible = true
